@@ -1,59 +1,84 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Loading from "./Loading";
-import products from "../data/products";
 
-const ChatbotModal = ({ onClose }) => {
+const ChatbotModal = ({ isOpen, onClose }) => {
   const [userInput, setUserInput] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [products, setProducts] = useState([]);
 
   const genAI = new GoogleGenerativeAI("AIzaSyCtE3-xi0Zr2PfiN128AehFv93UQExe49c");
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+  // Fetch products from JSON server
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/products");
+        if (!response.ok) throw new Error("Failed to fetch products");
+        const data = await response.json();
+        setProducts(data);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        setProducts([]); // Fallback to empty list if fetching fails
+      }
+    };
+    fetchProducts();
+  }, []);
 
   const handleUserInput = (e) => setUserInput(e.target.value);
 
   const sendMessage = async () => {
     if (userInput.trim() === "") return;
-
+  
     setIsLoading(true);
     let botMessage = "";
-
+  
     // Check for keywords in user input to respond with product-specific information
-    if (userInput.toLowerCase().includes("shirts")) {
-      const shirts = products.filter((p) => p.category === "Shirts");
+    const lowerInput = userInput.toLowerCase();
+  
+    const filterProductsByCategory = (category) => 
+      category ? products.filter((p) => p.category.toLowerCase() === category) : products;
+  
+    const findExpensiveOrCheap = (category, type) => {
+      const filteredProducts = filterProductsByCategory(category);
+      if (!filteredProducts.length) return `We currently don't have any ${category || "products"} in stock.`;
+  
+      const sorted = [...filteredProducts].sort((a, b) => 
+        type === "expensive" ? b.price - a.price : a.price - b.price
+      );
+      const product = sorted[0];
+      return `Our ${type} ${category || "product"} is "${product.name}" priced at $${product.price}.`;
+    };
+  
+    if (lowerInput.includes("most expensive") || lowerInput.includes("less expensive")) {
+      const type = lowerInput.includes("most expensive") ? "expensive" : "cheap";
+      if (lowerInput.includes("shoes")) botMessage = findExpensiveOrCheap("shoes", type);
+      else if (lowerInput.includes("shirts")) botMessage = findExpensiveOrCheap("shirts", type);
+      else if (lowerInput.includes("pants")) botMessage = findExpensiveOrCheap("pants", type);
+      else botMessage = findExpensiveOrCheap(null, type); // General products
+    } else if (lowerInput.includes("shirts")) {
+      const shirts = filterProductsByCategory("shirts");
       botMessage = shirts.length
         ? `Here are our shirts:\n${shirts.map((s) => `• ${s.name} - $${s.price}`).join("\n")}`
         : "We currently don't have any shirts in stock.";
-    } else if (userInput.toLowerCase().includes("pants")) {
-      const pants = products.filter((p) => p.category === "Pants");
+    } else if (lowerInput.includes("pants")) {
+      const pants = filterProductsByCategory("pants");
       botMessage = pants.length
         ? `Here are our pants:\n${pants.map((p) => `• ${p.name} - $${p.price}`).join("\n")}`
         : "We currently don't have any pants in stock.";
+    } else if (lowerInput.includes("shoes")) {
+      const shoes = filterProductsByCategory("shoes");
+      botMessage = shoes.length
+        ? `Here are our shoes:\n${shoes.map((s) => `• ${s.name} - $${s.price}`).join("\n")}`
+        : "We currently don't have any shoes in stock.";
     } else if (
-      userInput.toLowerCase().includes("all products") ||
-      userInput.toLowerCase().includes("everything") ||
-      userInput.toLowerCase().includes("what products do you have")
+      lowerInput.includes("all products") ||
+      lowerInput.includes("everything") ||
+      lowerInput.includes("what products do you have")
     ) {
       botMessage = `Here is our full product list:\n${products.map((p) => `• ${p.name} - $${p.price}`).join("\n")}`;
-    } else if (userInput.toLowerCase().includes("cost") || userInput.toLowerCase().includes("price")) {
-      botMessage = `Here are our products with their prices:\n${products.map((p) => `• ${p.name}: $${p.price}`).join("\n")}`;
-    } else if (userInput.toLowerCase().includes("cheapest")) {
-      const cheapest = products.reduce((min, p) => (p.price < min.price ? p : min), products[0]);
-      botMessage = `The cheapest item we have is ${cheapest.name} for $${cheapest.price}.`;
-    } else if (userInput.toLowerCase().includes("most expensive")) {
-      const mostExpensive = products.reduce((max, p) => (p.price > max.price ? p : max), products[0]);
-      botMessage = `The most expensive item we have is ${mostExpensive.name} for $${mostExpensive.price}.`;
-    } else if (userInput.toLowerCase().includes("jeans")) {
-      const jeans = products.find((p) => p.name.toLowerCase().includes("jeans"));
-      botMessage = jeans
-        ? `We have ${jeans.name} available for $${jeans.price}.`
-        : "We currently don't have jeans in stock.";
-    } else if (userInput.toLowerCase().includes("discounts") || userInput.toLowerCase().includes("sales")) {
-      botMessage = "Currently, we don’t have any discounts or sales.";
-    } else if (userInput.toLowerCase().includes("category") || userInput.toLowerCase().includes("types of products")) {
-      const categories = [...new Set(products.map((p) => p.category))];
-      botMessage = `We offer products in the following categories: ${categories.join(", ")}.`;
     } else {
       try {
         const result = await model.generateContent(userInput);
@@ -62,7 +87,7 @@ const ChatbotModal = ({ onClose }) => {
         botMessage = "Sorry, I'm having trouble answering that.";
       }
     }
-
+  
     setChatHistory([
       ...chatHistory,
       { type: "user", message: userInput },
@@ -71,6 +96,8 @@ const ChatbotModal = ({ onClose }) => {
     setUserInput("");
     setIsLoading(false);
   };
+  
+  
 
   const clearChat = () => setChatHistory([]);
 
@@ -92,6 +119,8 @@ const ChatbotModal = ({ onClose }) => {
     };
   };
 
+  if (!isOpen) return null; // No renderizar si no está abierto.
+
   return (
     <div className="fixed bottom-4 right-4 w-96 max-w-full h-96 p-4 bg-white rounded-lg shadow-lg z-50 border border-gray-200 transition-all">
       {/* Header */}
@@ -105,7 +134,7 @@ const ChatbotModal = ({ onClose }) => {
             Clear
           </button>
           <button
-            onClick={onClose}
+            onClick={onClose} // Llama a onClose para cerrar el modal.
             className="text-gray-500 hover:text-gray-700 transition duration-200"
           >
             X
