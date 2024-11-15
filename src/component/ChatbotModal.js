@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Loading from "./Loading";
+import Lottie from 'lottie-react';
 
 const ChatbotModal = ({ isOpen, onClose }) => {
   const [userInput, setUserInput] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [products, setProducts] = useState([]);
+  const [showBotAnimation, setShowBotAnimation] = useState(true);
 
   const genAI = new GoogleGenerativeAI("AIzaSyCtE3-xi0Zr2PfiN128AehFv93UQExe49c");
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -31,27 +33,28 @@ const ChatbotModal = ({ isOpen, onClose }) => {
 
   const sendMessage = async () => {
     if (userInput.trim() === "") return;
-  
+
     setIsLoading(true);
+    setShowBotAnimation(true); // Show bot animation while processing
     let botMessage = "";
-  
+
     // Check for keywords in user input to respond with product-specific information
     const lowerInput = userInput.toLowerCase();
-  
-    const filterProductsByCategory = (category) => 
+
+    const filterProductsByCategory = (category) =>
       category ? products.filter((p) => p.category.toLowerCase() === category) : products;
-  
+
     const findExpensiveOrCheap = (category, type) => {
       const filteredProducts = filterProductsByCategory(category);
       if (!filteredProducts.length) return `We currently don't have any ${category || "products"} in stock.`;
-  
-      const sorted = [...filteredProducts].sort((a, b) => 
+
+      const sorted = [...filteredProducts].sort((a, b) =>
         type === "expensive" ? b.price - a.price : a.price - b.price
       );
       const product = sorted[0];
       return `Our ${type} ${category || "product"} is "${product.name}" priced at $${product.price}.`;
     };
-  
+
     if (lowerInput.includes("most expensive") || lowerInput.includes("less expensive")) {
       const type = lowerInput.includes("most expensive") ? "expensive" : "cheap";
       if (lowerInput.includes("shoes")) botMessage = findExpensiveOrCheap("shoes", type);
@@ -87,7 +90,7 @@ const ChatbotModal = ({ isOpen, onClose }) => {
         botMessage = "Sorry, I'm having trouble answering that.";
       }
     }
-  
+
     setChatHistory([
       ...chatHistory,
       { type: "user", message: userInput },
@@ -95,9 +98,8 @@ const ChatbotModal = ({ isOpen, onClose }) => {
     ]);
     setUserInput("");
     setIsLoading(false);
+    setShowBotAnimation(true); // Hide animation after response
   };
-  
-  
 
   const clearChat = () => setChatHistory([]);
 
@@ -126,19 +128,32 @@ const ChatbotModal = ({ isOpen, onClose }) => {
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-bold text-blue-600">Chat Support</h2>
-        <div className="flex space-x-2">
-          <button
-            onClick={clearChat}
-            className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition duration-200"
-          >
-            Clear
-          </button>
-          <button
-            onClick={onClose} // Llama a onClose para cerrar el modal.
-            className="text-gray-500 hover:text-gray-700 transition duration-200"
-          >
-            X
-          </button>
+        <div className="flex items-center space-x-2">
+          {/* Bot Animation (conditionally rendered) */}
+          <div className="ml-2">
+            {showBotAnimation && (
+              <Lottie
+                animationData={require('../assets/animations/Animation - 1731702302081.json')} // Path to your Lottie JSON
+                loop={true}
+                autoplay={true}
+                style={{ width: 60, height: 60 }} // Adjust the size of the animation
+              />
+            )}
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={clearChat}
+              className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition duration-200"
+            >
+              Clear
+            </button>
+            <button
+              onClick={onClose} // Llama a onClose para cerrar el modal.
+              className="text-gray-500 hover:text-gray-700 transition duration-200"
+            >
+              X
+            </button>
+          </div>
         </div>
       </div>
 
@@ -159,7 +174,7 @@ const ChatbotModal = ({ isOpen, onClose }) => {
       </div>
 
       {/* Input and Buttons */}
-      <div className="flex items-center">
+      <div className="flex items-center space-x-2">
         <input
           type="text"
           className="flex-grow p-3 border border-gray-300 rounded-l-lg focus:outline-none"
