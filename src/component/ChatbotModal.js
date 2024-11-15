@@ -68,6 +68,43 @@ const ChatbotModal = ({ isOpen, onClose }) => {
 
   const clearChat = () => setChatHistory([]);
 
+  // Voice recognition function
+  const startVoiceRecognition = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      console.error("Speech Recognition is not supported in this browser.");
+      alert("Speech Recognition is not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US"; // Set language
+    recognition.interimResults = true; // Allow partial results
+
+    recognition.start();
+
+    recognition.onstart = () => {
+      console.log("Voice recognition started");
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      console.log("Transcript: ", transcript);
+      setUserInput(transcript);
+      sendMessage(); // Send the message once the recognition is done
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error: ", event.error);
+      alert(`Speech recognition error: ${event.error}`);
+    };
+
+    recognition.onend = () => {
+      console.log("Voice recognition ended");
+    };
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -119,6 +156,12 @@ const ChatbotModal = ({ isOpen, onClose }) => {
           disabled={isLoading}
         >
           Send
+        </button>
+        <button
+          onClick={startVoiceRecognition}
+          className="ml-2 p-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+        >
+          🎤
         </button>
       </div>
     </div>
